@@ -1108,3 +1108,99 @@ test "validate_accounts_callback batch count race" {
 
     b.validate_accounts_callback(0, result);
 }
+
+test "validate_accounts_callback scenarios" {
+    const allocator = std.testing.allocator;
+
+    var b: Benchmark = undefined;
+    b.stage = .validate_accounts;
+    b.account_index = 0;
+    b.account_count = 0;
+    b.account_batch_count = 30;
+
+    const client_replies = try allocator.alignedAlloc(
+        [constants.message_body_size_max]u8,
+        constants.sector_size,
+        2,
+    );
+    defer allocator.free(client_replies);
+
+    b.client_replies = client_replies;
+
+    const all_accounts = stdx.bytes_as_slice(.exact, tb.Account, &client_replies[0]);
+    for (all_accounts, 0..) |*account, i| {
+        account.* = .{
+            .id = i + 1,
+            .user_data_128 = 0,
+            .user_data_64 = 0,
+            .user_data_32 = 0,
+            .reserved = 0,
+            .ledger = 2,
+            .code = 1,
+            .flags = .{},
+            .debits_pending = 0,
+            .debits_posted = 0,
+            .credits_pending = 0,
+            .credits_posted = 0,
+            .timestamp = 0,
+        };
+    }
+
+    const all_accounts_1 = stdx.bytes_as_slice(.exact, tb.Account, &client_replies[1]);
+    for (all_accounts_1, 0..) |*account, i| {
+        account.* = .{
+            .id = i + 1,
+            .user_data_128 = 0,
+            .user_data_64 = 0,
+            .user_data_32 = 0,
+            .reserved = 0,
+            .ledger = 2,
+            .code = 1,
+            .flags = .{},
+            .debits_pending = 0,
+            .debits_posted = 0,
+            .credits_pending = 0,
+            .credits_posted = 0,
+            .timestamp = 0,
+        };
+    }
+
+    b.clients_busy.set(1);
+
+    {
+        b.validate_accounts_batch_count[0] = 30;
+        const result = try allocator.alloc(u8, 30 * @sizeOf(tb.Account));
+        defer allocator.free(result);
+
+        stdx.copy_disjoint(.exact, u8, result, std.mem.sliceAsBytes(all_accounts[0..30]));
+        b.validate_accounts_callback(0, result);
+    }
+
+    {
+        b.validate_accounts_batch_count[0] = 17;
+        const result = try allocator.alloc(u8, 17 * @sizeOf(tb.Account));
+        defer allocator.free(result);
+
+        stdx.copy_disjoint(.exact, u8, result, std.mem.sliceAsBytes(all_accounts[0..17]));
+        b.validate_accounts_callback(0, result);
+    }
+
+    {
+        b.validate_accounts_batch_count[0] = 1;
+        const result = try allocator.alloc(u8, 1 * @sizeOf(tb.Account));
+        defer allocator.free(result);
+
+        stdx.copy_disjoint(.exact, u8, result, std.mem.sliceAsBytes(all_accounts[0..1]));
+        b.validate_accounts_callback(0, result);
+    }
+
+    {
+        b.validate_accounts_batch_count[0] = 30;
+        b.validate_accounts_batch_count[1] = 17;
+        const result = try allocator.alloc(u8, 30 * @sizeOf(tb.Account));
+        defer allocator.free(result);
+
+        stdx.copy_disjoint(.exact, u8, result, std.mem.sliceAsBytes(all_accounts[0..30]));
+        b.validate_accounts_callback(0, result);
+    }
+}
