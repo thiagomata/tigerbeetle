@@ -101,6 +101,8 @@ pub fn build(b: *std.Build) !void {
         .test_integration_build = b.step("test:integration:build", "Build integration tests"),
         .test_unit = b.step("test:unit", "Run unit tests"),
         .test_unit_build = b.step("test:unit:build", "Build unit tests"),
+        .test_benchmark_load = b.step("test:benchmark-load", "Run benchmark load unit tests"),
+        .test_benchmark_load_build = b.step("test:benchmark-load:build", "Build benchmark tests"),
         .test_jni = b.step("test:jni", "Run Java JNI tests"),
         .vopr = b.step("vopr", "Run the VOPR"),
         .vopr_build = b.step("vopr:build", "Build the VOPR"),
@@ -287,6 +289,8 @@ pub fn build(b: *std.Build) !void {
         .test_unit_build = build_steps.test_unit_build,
         .test_integration = build_steps.test_integration,
         .test_integration_build = build_steps.test_integration_build,
+        .test_benchmark_load = build_steps.test_benchmark_load,
+        .test_benchmark_load_build = build_steps.test_benchmark_load_build,
         .test_fmt = build_steps.test_fmt,
         .@"test" = build_steps.@"test",
     }, .{
@@ -851,6 +855,8 @@ fn build_test(
         test_unit_build: *std.Build.Step,
         test_integration: *std.Build.Step,
         test_integration_build: *std.Build.Step,
+        test_benchmark_load: *std.Build.Step,
+        test_benchmark_load_build: *std.Build.Step,
         test_fmt: *std.Build.Step,
         @"test": *std.Build.Step,
     },
@@ -914,6 +920,27 @@ fn build_test(
 
     run_unit_tests.setCwd(b.path("."));
 
+    const benchmark_load_tests = b.addTest(.{
+        .name = "test-benchmark-load",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tigerbeetle/benchmark_load_test.zig"),
+            .target = options.target,
+            .optimize = options.mode,
+        }),
+        .filters = b.args orelse &.{},
+    });
+    benchmark_load_tests.root_module.addImport("vsr", options.vsr_module_test);
+    benchmark_load_tests.root_module.addImport("stdx", options.stdx_module);
+
+    steps.test_benchmark_load_build.dependOn(&b.addInstallArtifact(benchmark_load_tests, .{}).step);
+
+    const run_benchmark_load_tests = b.addRunArtifact(benchmark_load_tests);
+    run_benchmark_load_tests.setEnvironmentVariable("ZIG_EXE", b.graph.zig_exe);
+    if (b.args != null) {
+        run_benchmark_load_tests.has_side_effects = true;
+    }
+    steps.test_benchmark_load.dependOn(&run_benchmark_load_tests.step);
+
     build_test_integration(b, .{
         .test_integration = steps.test_integration,
         .test_integration_build = steps.test_integration_build,
@@ -934,6 +961,7 @@ fn build_test(
 
     steps.@"test".dependOn(&run_stdx_unit_tests.step);
     steps.@"test".dependOn(&run_unit_tests.step);
+    steps.@"test".dependOn(&run_benchmark_load_tests.step);
     if (b.args == null) {
         steps.@"test".dependOn(steps.test_integration);
         steps.@"test".dependOn(steps.test_fmt);

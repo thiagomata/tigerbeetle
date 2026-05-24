@@ -167,6 +167,7 @@ const quine =
     \\            !std.mem.startsWith(u8, entry_path, "clients/c")) continue;
     \\        if (std.mem.eql(u8, entry_path, "clients/c/tb_client_header_test.zig")) continue;
     \\        if (std.mem.eql(u8, entry_path, "tigerbeetle/libtb_client.zig")) continue;
+    \\        if (std.mem.eql(u8, entry_path, "tigerbeetle/benchmark_load.zig")) continue;
     \\
     \\        const contents = try src_dir.readFileAlloc(arena, entry_path, 1 * MiB);
     \\        var line_iterator = std.mem.splitScalar(u8, contents, '\n');
@@ -291,6 +292,7 @@ fn unit_test_files(arena: std.mem.Allocator, src_dir: std.fs.Dir) ![]const []con
             !std.mem.startsWith(u8, entry_path, "clients/c")) continue;
         if (std.mem.eql(u8, entry_path, "clients/c/tb_client_header_test.zig")) continue;
         if (std.mem.eql(u8, entry_path, "tigerbeetle/libtb_client.zig")) continue;
+        if (std.mem.eql(u8, entry_path, "tigerbeetle/benchmark_load.zig")) continue;
 
         const contents = try src_dir.readFileAlloc(arena, entry_path, 1 * MiB);
         var line_iterator = std.mem.splitScalar(u8, contents, '\n');
