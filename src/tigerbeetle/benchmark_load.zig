@@ -331,6 +331,8 @@ const Benchmark = struct {
     imported: bool,
     validate: bool,
     print_batch_timings: bool,
+    validate_accounts_batch_count: [constants.clients_max]u32 = @splat(undefined),
+    validate_transfers_batch_count: [constants.clients_max]u32 = @splat(undefined),
 
     // State:
     clients_busy: stdx.BitSetType(constants.clients_max) = .{},
@@ -679,6 +681,7 @@ const Benchmark = struct {
         )[0..account_count];
         b.build_accounts(accounts);
         for (account_ids, accounts) |*account_id, account| account_id.* = account.id;
+        b.validate_accounts_batch_count[client_index] = account_count;
         b.request(client_index, .lookup_accounts, .{
             .batch_count = account_count,
             .event_size = @sizeOf(u128),
@@ -692,15 +695,7 @@ const Benchmark = struct {
     ) void {
         assert(b.stage == .validate_accounts);
 
-        const accounts_count = accounts_count: {
-            if (b.account_index == b.account_count) {
-                // The last batch might not be full.
-                const remaining = @rem(b.account_count, b.account_batch_count);
-                if (remaining > 0) break :accounts_count remaining;
-            }
-
-            break :accounts_count b.account_batch_count;
-        };
+        const accounts_count = b.validate_accounts_batch_count[client_index];
         const accounts_expected_body = &b.client_replies[client_index];
         const accounts_expected = stdx.bytes_as_slice(
             .exact,
@@ -759,6 +754,7 @@ const Benchmark = struct {
         )[0..transfer_count];
         b.build_transfers(transfers);
         for (transfer_ids, transfers) |*transfer_id, transfer| transfer_id.* = transfer.id;
+        b.validate_transfers_batch_count[client_index] = transfer_count;
         b.request(client_index, .lookup_transfers, .{
             .batch_count = transfer_count,
             .event_size = @sizeOf(u128),
@@ -772,15 +768,7 @@ const Benchmark = struct {
     ) void {
         assert(b.stage == .validate_transfers);
 
-        const transfers_count = transfers_count: {
-            if (b.transfer_index == b.transfer_count) {
-                // The last batch might not be full.
-                const remaining = @rem(b.transfer_count, b.transfer_batch_count);
-                if (remaining > 0) break :transfers_count remaining;
-            }
-
-            break :transfers_count b.transfer_batch_count;
-        };
+        const transfers_count = b.validate_transfers_batch_count[client_index];
         const transfers_expected = stdx.bytes_as_slice(
             .exact,
             tb.Transfer,
@@ -1099,6 +1087,8 @@ test "validate_accounts_callback batch count race" {
 
     const result = try allocator.alloc(u8, b.account_batch_count * @sizeOf(tb.Account));
     defer allocator.free(result);
+
+    b.validate_accounts_batch_count[0] = 30;
 
     b.validate_accounts_callback(0, result);
 }
