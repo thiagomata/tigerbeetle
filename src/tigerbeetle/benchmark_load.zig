@@ -1094,3 +1094,27 @@ fn print_percentiles_histogram(
         }) catch unreachable;
     }
 }
+
+test "validate_accounts_callback batch count race" {
+    const allocator = std.testing.allocator;
+
+    var b: Benchmark = undefined;
+    b.stage = .validate_accounts;
+    b.account_count = 100;
+    b.account_batch_count = 30;
+    b.account_index = 100;
+
+    const client_replies = try allocator.alignedAlloc(
+        [constants.message_body_size_max]u8,
+        constants.sector_size,
+        1,
+    );
+    defer allocator.free(client_replies);
+
+    b.client_replies = client_replies;
+
+    const result = try allocator.alloc(u8, b.account_batch_count * @sizeOf(tb.Account));
+    defer allocator.free(result);
+
+    b.validate_accounts_callback(0, result);
+}

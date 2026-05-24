@@ -1235,6 +1235,7 @@ const DeadFilesDetector = struct {
             "go_bindings.zig",
             "integration_tests.zig",
             "java_bindings.zig",
+            "benchmark_load_test.zig",
             "jni_tests.zig",
             "libtb_client.zig",
             "main.zig",
