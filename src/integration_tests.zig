@@ -496,3 +496,65 @@ test "vortex smoke" {
         .{ .vortex_exe = vortex_exe },
     );
 }
+
+test "validate accounts multi-client race" {
+    // Regression test for the multi-client validate race condition.
+    // With --clients=2 and --validate, overlapping callbacks recompute
+    // batch count from the shared counter, causing an assertion failure.
+    // This test crashes on the buggy code (non-zero exit) and passes
+    // once the fix is applied (per-client batch counts at send time).
+
+    const data_file = data_file: {
+        var random_bytes: [4]u8 = undefined;
+        std.crypto.random.bytes(&random_bytes);
+        const random_suffix: [8]u8 = std.fmt.bytesToHex(random_bytes, .lower);
+        break :data_file "0_0-" ++ random_suffix ++ ".tigerbeetle.benchmark";
+    };
+    defer std.fs.cwd().deleteFile(data_file) catch {};
+
+    const shell = try Shell.create(std.testing.allocator);
+    defer shell.destroy();
+
+    try shell.exec(
+        "{tigerbeetle} benchmark" ++
+            " --account-count=50" ++
+            " --account-batch-count=30" ++
+            " --clients=2" ++
+            " --validate" ++
+            " --id-order=sequential" ++
+            " --transfer-count=0" ++
+            " --file={data_file}",
+        .{ .tigerbeetle = tigerbeetle, .data_file = data_file },
+    );
+}
+
+test "validate transfers multi-client race" {
+    // Regression test for the multi-client validate race condition, transfers side.
+    // Same shared-counter recompute bug as "validate accounts multi-client race",
+    // but in validate_transfers_callback / transfer_index / transfer_batch_count.
+    // This test crashes on the buggy code (non-zero exit) and passes
+    // once the fix is applied (per-client batch counts at send time).
+
+    const data_file = data_file: {
+        var random_bytes: [4]u8 = undefined;
+        std.crypto.random.bytes(&random_bytes);
+        const random_suffix: [8]u8 = std.fmt.bytesToHex(random_bytes, .lower);
+        break :data_file "0_0-" ++ random_suffix ++ ".tigerbeetle.benchmark";
+    };
+    defer std.fs.cwd().deleteFile(data_file) catch {};
+
+    const shell = try Shell.create(std.testing.allocator);
+    defer shell.destroy();
+
+    try shell.exec(
+        "{tigerbeetle} benchmark" ++
+            " --account-count=50" ++
+            " --transfer-count=50" ++
+            " --transfer-batch-count=30" ++
+            " --clients=2" ++
+            " --validate" ++
+            " --id-order=sequential" ++
+            " --file={data_file}",
+        .{ .tigerbeetle = tigerbeetle, .data_file = data_file },
+    );
+}
